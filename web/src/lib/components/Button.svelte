@@ -63,6 +63,7 @@
 			filter 0.08s;
 		touch-action: manipulation;
 		-webkit-tap-highlight-color: transparent;
+		white-space: nowrap;
 	}
 	.md {
 		font-size: 20px;

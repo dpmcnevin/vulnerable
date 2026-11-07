@@ -21,7 +21,7 @@
 	const run = $derived(game.run!);
 	const items = $derived.by(() => {
 		void game.v;
-		return run.shop!.items.slice();
+		return run.shop!.items.map((it) => ({ ...it }));
 	});
 	const money = new Tween(0, { duration: 450, easing: cubicOut });
 	$effect(() => {
@@ -128,7 +128,7 @@
 			{#each { length: engine.RELIC_SLOTS }, i (i)}
 				{@const relic = run.relics[i]}
 				{#if relic}
-					<div class="relic panel-like" style:border-color={css(C.rarity[relic.def.rarity])} title={relics.textFor(relic)}>
+					<div class="relic panel-like" style:border-color={css(C.rarity[relic.def.rarity])} title={relics.textFor((void game.v, relic))}>
 						<div class="relic-head"><Icon name={relic.key} scale={2} /><span>{relic.name}</span></div>
 						<Button variant="plain" size="sm" sound="sell" onclick={() => game.sellRelic(i)} style="width: 100%"
 							>Sell ${Math.max(1, Math.floor(relic.cost / 2))}</Button

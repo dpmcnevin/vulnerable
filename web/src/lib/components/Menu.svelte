@@ -26,25 +26,86 @@
 	});
 
 	const fanY = $derived(L.orientation === 'portrait' ? 230 : 120);
-	const aces = $derived.by((): Placement[] => {
+
+	// The aces can be picked up and dropped anywhere; a tap flips one over.
+	let moved = $state<({ x: number; y: number; r: number } | null)[]>([null, null, null, null]);
+	let faceUp = $state([true, true, true, true]);
+	let order = $state([0, 1, 2, 3]);
+	let drag = $state.raw<{ i: number; id: number; dx: number; dy: number; sx: number; sy: number; x: number; y: number; moved: boolean } | null>(null);
+	let stageEl: HTMLElement | null = null;
+
+	function fanSpot(i: number) {
 		const lean = mouseX < 0 ? 0 : ((mouseX - L.W / 2) / L.W) * 0.12;
-		return ACES.map((card, i) => {
-			const k = i + 1 - 2.5;
+		const k = i + 1 - 2.5;
+		return {
+			x: L.W / 2 + k * 70,
+			y: fanY + k * k * 6 + Math.sin(t * 1.4 + i + 1) * 4,
+			r: k * 0.16 + lean
+		};
+	}
+	function spot(i: number) {
+		if (drag?.i === i && drag.moved) return { x: drag.x, y: drag.y, r: 0 };
+		return moved[i] ?? fanSpot(i);
+	}
+	const aces = $derived.by((): Placement[] =>
+		ACES.map((card, i) => {
+			const p = spot(i);
+			const held = drag?.i === i && drag.moved;
 			return {
 				id: -(i + 1),
 				card,
-				x: L.W / 2 + k * 70,
-				y: fanY + k * k * 6 + Math.sin(t * 1.4 + i + 1) * 4,
-				r: k * 0.16 + lean,
-				s: 1.1,
-				faceUp: true,
-				z: i,
-				lift: 6,
+				x: p.x,
+				y: p.y,
+				r: p.r,
+				s: held ? 1.2 : 1.1,
+				faceUp: faceUp[i],
+				z: held ? 50 : 10 + order.indexOf(i),
+				lift: held ? 26 : 6,
 				flipDelay: 0.05,
 				spawn: { x: L.W / 2, y: -150, delay: 0.15 + (i + 1) * 0.09, faceUp: false, sound: true }
 			};
-		});
-	});
+		})
+	);
+
+	function point(e: PointerEvent): [number, number] {
+		const r = stageEl!.getBoundingClientRect();
+		const k = stageEl!.offsetWidth / r.width;
+		return [(e.clientX - r.left) * k, (e.clientY - r.top) * k];
+	}
+	function grab(e: PointerEvent, i: number) {
+		if (e.button !== 0) return;
+		e.stopPropagation();
+		stageEl = (e.currentTarget as HTMLElement).closest('.stage') as HTMLElement;
+		const [x, y] = point(e);
+		const p = spot(i);
+		drag = { i, id: e.pointerId, dx: x - p.x, dy: y - p.y, sx: x, sy: y, x: p.x, y: p.y, moved: false };
+		order = [...order.filter((j) => j !== i), i];
+	}
+	function dragMove(e: PointerEvent) {
+		if (!drag || e.pointerId !== drag.id) return;
+		const [x, y] = point(e);
+		const isMoved = drag.moved || Math.hypot(x - drag.sx, y - drag.sy) > 6;
+		if (isMoved && !drag.moved) sound.play('card_hover', { jitter: 0.1, volume: 0.6 });
+		drag = { ...drag, x: x - drag.dx, y: y - drag.dy, moved: isMoved };
+	}
+	function drop(e: PointerEvent) {
+		const d = drag;
+		if (!d || e.pointerId !== d.id) return;
+		drag = null;
+		if (d.moved) {
+			const tilt = ((((d.x * 7 + d.y * 13) % 11) + 11) % 11 - 5) * 0.03;
+			moved[d.i] = { x: Math.max(40, Math.min(L.W - 40, d.x)), y: Math.max(56, Math.min(L.H - 56, d.y)), r: tilt };
+			sound.play('card_play', { jitter: 0.1 });
+		} else {
+			faceUp[d.i] = !faceUp[d.i];
+		}
+	}
+	function resetFan() {
+		moved = [null, null, null, null];
+		faceUp = [true, true, true, true];
+		sound.play('reroll');
+	}
+	const scattered = $derived(moved.some((m) => m) || faceUp.some((f) => !f));
 
 	const canContinue = $derived(
 		!!game.run && game.run.phase !== PHASE.GAME_OVER && game.run.phase !== PHASE.VICTORY
@@ -58,6 +119,8 @@
 	}
 </script>
 
+<svelte:window onpointermove={dragMove} onpointerup={drop} onpointercancel={() => (drag = null)} />
+
 <div class="menu" role="presentation" onpointermove={(e) => {
 	const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
 	mouseX = ((e.clientX - r.left) / r.width) * L.W;
@@ -66,6 +129,23 @@
 	{#each aces as p (p.id)}
 		<CardSprite {p} />
 	{/each}
+	<!-- Grab handles that follow the aces (rotation ignored: a generous target). -->
+	{#each aces as p, i (p.id)}
+		<div
+			class="grab"
+			class:held={drag?.i === i && drag.moved}
+			role="button"
+			tabindex="-1"
+			aria-label="Ace"
+			style:left="{p.x - 46}px"
+			style:top="{p.y - 64}px"
+			style:z-index={p.z + 1}
+			onpointerdown={(e) => grab(e, i)}
+		></div>
+	{/each}
+	{#if scattered}
+		<button class="tidy" onclick={resetFan}>Tidy the aces</button>
+	{/if}
 
 	<div class="content" style:top="{fanY + 90}px">
 		<h1>VULNERABLE</h1>
@@ -131,6 +211,30 @@
 	.menu {
 		position: absolute;
 		inset: 0;
+	}
+	.grab {
+		position: absolute;
+		width: 92px;
+		height: 128px;
+		cursor: grab;
+		touch-action: none;
+	}
+	.grab.held {
+		cursor: grabbing;
+	}
+	.tidy {
+		position: absolute;
+		right: 20px;
+		bottom: 20px;
+		z-index: 60;
+		font: inherit;
+		font-size: 14px;
+		background: var(--panel-edge);
+		color: var(--ink);
+		border: none;
+		border-radius: 6px;
+		padding: 6px 12px;
+		cursor: pointer;
 	}
 	.content {
 		position: absolute;

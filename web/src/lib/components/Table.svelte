@@ -24,6 +24,132 @@
 
 	let hover = $state<{ seat: number; id: number } | null>(null);
 
+	// ---------------------------------------------------------- rearranging
+	//
+	// Drag any card in your hand (or dummy's, once it's face up) to put it
+	// anywhere: the order lasts for the rest of the deal. Dragging a playable
+	// card into the middle of the table plays it.
+
+	/** Your chosen order per deal and seat, as card ids. */
+	const handOrder = new WeakMap<object, Record<number, number[]>>();
+	let orderV = $state(0);
+
+	interface Drag {
+		seat: number;
+		card: Card;
+		id: number;
+		pointerId: number;
+		startX: number;
+		startY: number;
+		x: number;
+		y: number;
+		moved: boolean;
+	}
+	let drag = $state.raw<Drag | null>(null);
+
+	function ordered(hand: Card[], seat: number): Card[] {
+		void orderV;
+		const saved = handOrder.get(game.rawDeal)?.[seat];
+		if (!saved) return hand;
+		const rank = new Map(saved.map((id, i) => [id, i]));
+		// Cards you haven't placed (new ones from a ploy) keep the engine's order, after yours.
+		return hand
+			.map((c, i) => ({ c, k: rank.get(cardId(c)) ?? saved.length + i }))
+			.sort((a, b) => a.k - b.k)
+			.map((x) => x.c);
+	}
+
+	/** While dragging: where the card would land among the others. */
+	function previewOrder(hand: Card[], seat: number): Card[] {
+		if (!drag || drag.seat !== seat || !drag.moved) return hand;
+		const others = hand.filter((c) => c !== drag!.card);
+		if (others.length === hand.length) return hand;
+		const slots = handSlots(L, hand, seat);
+		let index = 0;
+		for (const sl of slots) if (sl.card !== drag.card && sl.cx < drag.x) index++;
+		others.splice(index, 0, drag.card);
+		return others;
+	}
+
+	/** Pointer position in stage coordinates. */
+	function stagePoint(e: PointerEvent): [number, number] {
+		const stage = ((e.target as HTMLElement).closest?.('.stage') as HTMLElement) ?? stageEl!;
+		const r = stage.getBoundingClientRect();
+		const k = stage.offsetWidth / r.width;
+		return [(e.clientX - r.left) * k, (e.clientY - r.top) * k];
+	}
+
+	function canDrag(h: HandView): boolean {
+		return h.seat === cards.SOUTH || deal.dummyVisible;
+	}
+
+	function down(e: PointerEvent, h: HandView, s: Slot) {
+		lastPointer = e.pointerType;
+		if (e.button !== 0 || !canDrag(h)) return;
+		const [x, y] = stagePoint(e);
+		stageEl = (e.target as HTMLElement).closest('.stage') as HTMLElement;
+		dragFrom = { h, s };
+		drag = { seat: h.seat, card: s.card, id: cardId(s.card), pointerId: e.pointerId, startX: x, startY: y, x, y, moved: false };
+	}
+
+	// Moves and releases are tracked on the window: reordering the hand moves
+	// the slot elements in the DOM, which would drop a pointer capture.
+	let stageEl: HTMLElement | null = null;
+	let dragFrom: { h: HandView; s: Slot } | null = null;
+	function windowUp(e: PointerEvent) {
+		if (drag && dragFrom && e.pointerId === drag.pointerId) up(e, dragFrom.h, dragFrom.s);
+	}
+
+	function move(e: PointerEvent) {
+		if (!drag || e.pointerId !== drag.pointerId) return;
+		const [x, y] = stagePoint(e);
+		const moved = drag.moved || Math.hypot(x - drag.startX, y - drag.startY) > 8;
+		if (moved && !drag.moved) {
+			hover = null;
+			sound.play('card_hover', { jitter: 0.1, volume: 0.6 });
+		}
+		drag = { ...drag, x, y, moved };
+	}
+
+	/** Is a stage point over the middle of the table (the drop zone for a play)? */
+	function overTrick(x: number, y: number): boolean {
+		const dx = (x - L.tableCX) / L.ovalRX,
+			dy = (y - L.trickCY) / L.ovalRY;
+		return dx * dx + dy * dy < 1;
+	}
+
+	function up(e: PointerEvent, h: HandView, s: Slot) {
+		const d = drag;
+		if (!d || e.pointerId !== d.pointerId) return;
+		drag = null;
+		dragFrom = null;
+		if (!d.moved) {
+			activate(h, s);
+			return;
+		}
+		if (h.legal.has(d.card) && overTrick(d.x, d.y)) {
+			game.playCard(d.card);
+			return;
+		}
+		// Keep the new order.
+		const hand = deal.state ? deal.state.hands[d.seat] : deal.hands[d.seat];
+		const before = ordered(hand, d.seat);
+		const others = before.filter((c) => c !== d.card);
+		const slots = handSlots(L, before, d.seat);
+		let index = 0;
+		for (const sl of slots) if (sl.card !== d.card && sl.cx < d.x) index++;
+		others.splice(index, 0, d.card);
+		const all = handOrder.get(game.rawDeal) ?? {};
+		all[d.seat] = others.map(cardId);
+		handOrder.set(game.rawDeal, all);
+		orderV++;
+		sound.play('card_play', { jitter: 0.1, volume: 0.5 });
+	}
+
+	function cancelDrag(e: PointerEvent) {
+		if (drag && e.pointerId === drag.pointerId) drag = null;
+	}
+
 	interface HandView {
 		seat: number;
 		slots: Slot[];
@@ -34,9 +160,11 @@
 
 	const hands = $derived.by((): HandView[] => {
 		void game.v;
+		void drag;
+		void orderV;
 		const out: HandView[] = [];
 		for (const seat of [cards.NORTH, cards.SOUTH]) {
-			const hand = deal.state ? deal.state.hands[seat] : deal.hands[seat];
+			const hand = previewOrder(ordered(deal.state ? deal.state.hands[seat] : deal.hands[seat], seat), seat);
 			const isTurn =
 				run.phase === PHASE.PLAY && engine.isPlayerTurn(run) && deal.state!.turn === seat && !game.trickHold;
 			const legal = new Set<Card>(isTurn ? play.legalPlays(deal.state!, seat) : []);
@@ -85,6 +213,24 @@
 					spawn = { x: o[0], y: o[1], r: 0.6, faceUp };
 				}
 				if (h.seat === cards.NORTH && !fresh) flipDelay = 0.05 + (idx + 1) * 0.035;
+				if (drag?.moved && drag.id === id) {
+					const dropPlays = h.legal.has(s.card) && overTrick(drag.x, drag.y);
+					out.push({
+						id,
+						card: s.card,
+						x: drag.x,
+						y: drag.y,
+						r: 0,
+						s: 1.14,
+						faceUp,
+						z: 95,
+						lift: 26,
+						highlight: dropPlays ? css(C.good) : null,
+						trump: s.card.suit === trump,
+						flipDelay
+					});
+					return;
+				}
 				out.push({
 					id,
 					card: s.card,
@@ -212,6 +358,8 @@
 	});
 </script>
 
+<svelte:window onpointermove={move} onpointerup={windowUp} onpointercancel={cancelDrag} />
+
 <div class="table" style:left="{L.table.x}px" style:top="{L.table.y}px" style:width="{L.table.w}px" style:height="{L.table.h}px">
 </div>
 
@@ -264,22 +412,26 @@
 
 <!-- Stable hit zones for your two hands (sprites move; these don't). -->
 {#each hands as h (h.seat)}
-	{#if h.isTurn || h.targetMode}
+	{#if canDrag(h) || h.isTurn || h.targetMode}
 		{#each h.slots as s (cardId(s.card))}
-			{#if h.targetMode || h.legal.has(s.card)}
-				<button
-					class="slot"
-					aria-label="Play {cards.name(s.card)}"
-					style:left="{s.x}px"
-					style:top="{L.handY[h.seat] - 20}px"
-					style:width="{s.w}px"
-					style:height="{CARD_H + 20}px"
-					onpointerenter={(e) => enter(e, h.seat, s.card)}
-					onpointerleave={(e) => leave(e, s.card)}
-					onpointerdown={(e) => (lastPointer = e.pointerType)}
-					onclick={() => activate(h, s)}
-				></button>
-			{/if}
+			{@const playable = h.targetMode || h.legal.has(s.card)}
+			<button
+				class="slot"
+				class:playable
+				class:dragging={drag?.moved && drag.id === cardId(s.card)}
+				aria-label={playable ? `Play ${cards.name(s.card)}` : cards.name(s.card)}
+				style:left="{s.x}px"
+				style:top="{L.handY[h.seat] - 20}px"
+				style:width="{s.w}px"
+				style:height="{CARD_H + 20}px"
+				onpointerenter={(e) => playable && enter(e, h.seat, s.card)}
+				onpointerleave={(e) => leave(e, s.card)}
+				onpointerdown={(e) => down(e, h, s)}
+				onclick={(e) => {
+					// Keyboard activation only; pointers are handled in up().
+					if (e.detail === 0) activate(h, s);
+				}}
+			></button>
 		{/each}
 	{/if}
 	{@const hand = h.slots}
@@ -288,6 +440,9 @@
 		{@const active = !!deal.state && deal.state.turn === h.seat && !deal.state.complete}
 		<div class="hand-label" class:active style:left="{L.tableCX - 200}px" style:top="{labelY}px">
 			{cards.SEATS[h.seat].name.toUpperCase()} · {cards.SEATS[h.seat].label}
+			{#if h.seat === cards.SOUTH && run.phase === PHASE.BID}
+				<span class="hcp">{cards.hcp(h.slots.map((x) => x.card))} HCP</span>
+			{/if}
 		</div>
 		{#if h.isTurn}
 			<div
@@ -386,9 +541,15 @@
 		background: transparent;
 		border: none;
 		padding: 0;
-		cursor: pointer;
-		touch-action: manipulation;
+		cursor: grab;
+		touch-action: none;
 		-webkit-tap-highlight-color: transparent;
+	}
+	.slot.playable {
+		cursor: pointer;
+	}
+	.slot.dragging {
+		cursor: grabbing;
 	}
 	.hand-label,
 	.your-play {
@@ -400,6 +561,15 @@
 		text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.6);
 		pointer-events: none;
 		z-index: 50;
+	}
+	.hcp {
+		margin-left: 8px;
+		padding: 1px 8px;
+		border-radius: 4px;
+		background: var(--brass);
+		color: var(--bg);
+		font-weight: 700;
+		text-shadow: none;
 	}
 	.hand-label.active {
 		color: var(--brass);

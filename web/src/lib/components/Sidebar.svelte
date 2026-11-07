@@ -179,7 +179,7 @@
 				{#if relic}
 					<div
 						class="relic"
-						title="{relic.name} ({relics.RARITY_NAME[relic.def.rarity]})&#10;{relics.textFor(relic)}"
+						title="{relic.name} ({relics.RARITY_NAME[relic.def.rarity]})&#10;{relics.textFor((void game.v, relic))}"
 					>
 						<Icon name={relic.key} scale={2} />
 						<span class="rarity" style:background={css(C.rarity[relic.def.rarity])}></span>

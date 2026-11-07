@@ -30,6 +30,10 @@
 		return game.recommended();
 	});
 	const myHcp = $derived(cards.hcp(deal.hands[deal.declarer]));
+	/** Your suit lengths, spades first: 5-4-3-1. */
+	const shape = $derived(
+		[4, 3, 2, 1].map((s) => cards.countSuit(deal.hands[deal.declarer], s)).join('-')
+	);
 
 	function chanceColor(p: number) {
 		if (p >= 0.7) return 'var(--good)';
@@ -77,7 +81,7 @@
 		<div class="need">Need {num(need)} more · {run.dealsLeft} deal{run.dealsLeft === 1 ? '' : 's'} left</div>
 	</div>
 	<div class="info">
-		<span>Your hand: {myHcp} points</span>
+		<span>Your hand: <b class="hcp">{myHcp} HCP</b> <span class="dim">{shape}</span></span>
 		{#if info.exact && info.hand}
 			<span class="partner">
 				<span class="ploy-light">Dummy:</span>
@@ -85,12 +89,12 @@
 					{@const ranks = cards.cardsOfSuit(info.hand, s).map((c) => cards.RANK_NAMES[c.rank]).join('')}
 					<span class="holding"><Suit suit={s} size={14} color={strainColor(s)} />{ranks || '-'}</span>
 				{/each}
-				<span class="dim">{info.hcp} points</span>
+				<span class="dim">{info.hcp} HCP</span>
 			</span>
 		{:else}
 			<span class="partner">
 				<span class="dim">Partner's bid:</span>
-				<span>{info.range.low}-{Math.min(info.range.high, 24)} points</span>
+				<span>{info.range.low}-{Math.min(info.range.high, 24)} HCP</span>
 				{#if info.longSuits.length > 0}
 					{#each info.longSuits as ls (ls.suit)}
 						<span class="holding">{ls.length}<Suit suit={ls.suit} size={16} color={strainColor(ls.suit)} /></span>
@@ -201,6 +205,9 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 3px;
+	}
+	.hcp {
+		color: var(--brass);
 	}
 	.ploy-light {
 		color: var(--ploy-light);
