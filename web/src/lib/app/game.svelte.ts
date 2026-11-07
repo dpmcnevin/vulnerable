@@ -15,6 +15,8 @@ import * as sound from '../audio/sound.ts';
 import { fx } from './fx.svelte.ts';
 import { getLayout, trickXY, type Layout, type Orientation } from './layout.ts';
 import { C, type Color } from '../ui/theme.ts';
+import * as save from './save.ts';
+import type { Action, Outcome } from './save.ts';
 
 const PHASE = engine.PHASE;
 
@@ -79,6 +81,8 @@ class Game {
 	sweeps = $state.raw<Sweep[]>([]);
 
 	private _run: Run | null = null;
+	/** Every action taken this run, for the auto-save. */
+	private actions: Action[] = [];
 	private lastPhase: string | null = null;
 	private aiTimer = 0;
 	private streak = 0;
@@ -119,6 +123,58 @@ class Game {
 		this.v++;
 	}
 
+	/**
+	 * Apply an action to the run and record it, then save. Every engine
+	 * mutation goes through here, so a replay of the log rebuilds the run.
+	 */
+	private act(a: Action): Outcome {
+		const out = save.applyAction(this._run!, a);
+		this.actions.push(a);
+		this.persist();
+		return out;
+	}
+
+	private persist() {
+		const run = this._run;
+		if (!run) return;
+		if (run.phase === PHASE.GAME_OVER || run.phase === PHASE.VICTORY) save.clear();
+		else save.store({ version: save.SAVE_VERSION, seed: run.seed, actions: this.actions });
+	}
+
+	/** Restore a saved run, if there is one. The menu then offers to continue it. */
+	restore(): boolean {
+		const s = save.load();
+		if (!s) return false;
+		try {
+			this.startRun(save.replay(s));
+			this.actions = s.actions.slice();
+			this.screen = 'menu';
+			return true;
+		} catch (err) {
+			console.warn('saved run could not be restored:', err);
+			save.clear();
+			return false;
+		}
+	}
+
+	private startRun(run: Run) {
+		fx.clear();
+		this._run = run;
+		this.actions = [];
+		this.selectedBid = null;
+		this.optionsCache = null;
+		this.trickHold = null;
+		this.reveal = null;
+		// A restored run lands mid-phase: don't replay its entry sound or count-up.
+		this.lastPhase = run.phase === PHASE.DEAL_SCORED ? null : run.phase;
+		this.modal = null;
+		this.targeting = null;
+		this.sweeps = [];
+		this.streak = 0;
+		this.aiTimer = AI_DELAY;
+		this.bump();
+	}
+
 	// ------------------------------------------------------------------ helpers
 
 	showToast(text: string, color: Color = C.brass) {
@@ -128,19 +184,10 @@ class Game {
 
 	newRun() {
 		const seed = this.seedInput !== '' ? this.seedInput.toUpperCase() : undefined;
-		fx.clear();
-		this._run = engine.newRun(seed);
-		this.screen = 'run';
-		this.selectedBid = null;
-		this.optionsCache = null;
-		this.trickHold = null;
-		this.reveal = null;
+		this.startRun(engine.newRun(seed));
 		this.lastPhase = null;
-		this.modal = null;
-		this.targeting = null;
-		this.sweeps = [];
-		this.streak = 0;
-		this.bump();
+		this.screen = 'run';
+		this.persist();
 	}
 
 	/** Odds and projections for every contract, recomputed when the deal changes. */
@@ -225,7 +272,7 @@ class Game {
 	commitSelectedBid() {
 		const run = this._run;
 		if (!run || run.phase !== PHASE.BID || !this.selectedBid) return;
-		const c = engine.commitBid(run, this.selectedBid, { stepwise: true });
+		const c = this.act({ t: 'bid', level: this.selectedBid.level, strain: this.selectedBid.strain }).contract!;
 		this.aiTimer = AI_DELAY;
 		this.streak = 0;
 		if (c.doubled > 0) {
@@ -239,7 +286,7 @@ class Game {
 	playCard(card: Card) {
 		const run = this._run!;
 		if (this.trickHold || !engine.isPlayerTurn(run)) return;
-		const tricks = engine.playerPlay(run, card, { stepwise: true });
+		const tricks = this.act({ t: 'play', card: cards.code(card) }).tricks!;
 		sound.play('card_play', { jitter: 0.08 });
 		this.holdTrick(tricks[0]);
 		this.aiTimer = AI_DELAY;
@@ -250,7 +297,7 @@ class Game {
 		const run = this._run!;
 		if (run.phase !== PHASE.PLAY) return;
 		this.trickHold = null;
-		engine.playOut(run);
+		this.act({ t: 'playOut' });
 		sound.play('reroll');
 		this.bump();
 	}
@@ -272,7 +319,12 @@ class Game {
 		if (deal && !deal.state) {
 			for (const seat of [cards.NORTH, cards.SOUTH]) for (const c of deal.hands[seat]) before.set(c, seat);
 		}
-		const [ok, msg] = engine.usePloy(run, index, target);
+		// A failed attempt changes nothing, so it isn't logged.
+		const check = engine.canUsePloy(run, index, target);
+		const usable = check[0] && !(check[2] && !target);
+		const { ok, message: msg } = usable
+			? this.act({ t: 'ploy', slot: index, target: target ? cards.code(target) : undefined })
+			: { ok: false, message: check[2] ? 'choose one of your cards' : check[1] };
 		if (!ok) {
 			this.showToast(msg ?? 'not now', C.bad);
 			sound.play('trick_lose', { volume: 0.6 });
@@ -313,7 +365,7 @@ class Game {
 	}
 
 	sellPloy(i: number) {
-		engine.sellPloy(this._run!, i);
+		this.act({ t: 'sellPloy', slot: i });
 		sound.play('sell');
 		this.modal = null;
 		this.bump();
@@ -334,7 +386,7 @@ class Game {
 			this.finishReveal();
 			return;
 		}
-		engine.continueAfterDeal(run);
+		this.act({ t: 'continue' });
 		this.selectedBid = null;
 		this.bump();
 	}
@@ -343,13 +395,14 @@ class Game {
 		const run = this._run!;
 		if (run.phase !== PHASE.BOARD_WON) return;
 		sound.play('coin');
-		engine.enterShop(run);
+		this.act({ t: 'shop' });
 		this.bump();
 	}
 
 	buy(i: number, x: number, y: number) {
 		const run = this._run!;
-		if (engine.buy(run, i)[0]) {
+		if (!engine.canBuy(run, i)[0]) return;
+		if (this.act({ t: 'buy', slot: i }).ok) {
 			sound.play('coin');
 			fx.burst(x, y, 30, C.confetti, 300, { life: 0.9 });
 			fx.shake(3);
@@ -358,13 +411,14 @@ class Game {
 	}
 
 	sellRelic(i: number) {
-		engine.sellRelic(this._run!, i);
+		this.act({ t: 'sellRelic', slot: i });
 		sound.play('sell');
 		this.bump();
 	}
 
 	reroll() {
-		if (engine.reroll(this._run!)) {
+		if (this._run!.money < this._run!.rerollCost) return;
+		if (this.act({ t: 'reroll' }).ok) {
 			sound.play('reroll');
 			this.shopRolls++;
 		}
@@ -374,7 +428,7 @@ class Game {
 	shopRolls = $state(0);
 
 	leaveShop() {
-		engine.leaveShop(this._run!);
+		this.act({ t: 'leave' });
 		this.selectedBid = null;
 		this.bump();
 	}
@@ -521,7 +575,7 @@ class Game {
 		if (run.phase === PHASE.PLAY && !engine.isPlayerTurn(run)) {
 			this.aiTimer -= dt;
 			if (this.aiTimer <= 0) {
-				const step = engine.stepAI(run);
+				const step = this.act({ t: 'ai' }).step;
 				sound.play('card_play', { jitter: 0.08 });
 				this.holdTrick(step?.trick);
 				this.aiTimer = AI_DELAY;

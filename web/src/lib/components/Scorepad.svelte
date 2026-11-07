@@ -17,8 +17,10 @@
 		return engine.scorepad(run);
 	});
 	const totals = $derived(engine.padTotals(pad));
+	// Above the line, each new score is written above the last: the first
+	// entry sits on the line. Only the most recent ones fit.
 	const MAX_ABOVE = 9;
-	const above = (list: PadEntry[]) => list.slice(Math.max(0, list.length - MAX_ABOVE)).reverse();
+	const above = (list: PadEntry[]) => list.slice(Math.max(0, list.length - MAX_ABOVE));
 </script>
 
 {#snippet entry(e: PadEntry)}
@@ -44,19 +46,21 @@
 		<div class="col-head">WE</div>
 		<div class="col-head">THEY</div>
 	</div>
-	<div class="above">
-		<div class="side">{#each above(pad.above.we) as e, i (i)}{@render entry(e)}{/each}</div>
-		<div class="side">{#each above(pad.above.they) as e, i (i)}{@render entry(e)}{/each}</div>
-	</div>
-	<div class="line"></div>
-	<div class="below">
-		{#each pad.games as g, gi (gi)}
-			<div class="game">
-				<div class="side">{#each g.we as e, i (i)}{@render entry(e)}{/each}</div>
-				<div class="side">{#each g.they as e, i (i)}{@render entry(e)}{/each}</div>
-			</div>
-			{#if g.won}<div class="ruled">game {gi + 1}</div>{/if}
-		{/each}
+	<!-- One continuous WE | THEY divider runs down the whole body. -->
+	<div class="body">
+		<div class="above">
+			<div class="side">{#each above(pad.above.we) as e, i (i)}{@render entry(e)}{/each}</div>
+			<div class="side">{#each above(pad.above.they) as e, i (i)}{@render entry(e)}{/each}</div>
+		</div>
+		<div class="below">
+			{#each pad.games as g, gi (gi)}
+				<div class="game">
+					<div class="side">{#each g.we as e, i (i)}{@render entry(e)}{/each}</div>
+					<div class="side">{#each g.they as e, i (i)}{@render entry(e)}{/each}</div>
+				</div>
+				{#if g.won}<div class="ruled"><span>game {gi + 1}</span></div>{/if}
+			{/each}
+		</div>
 	</div>
 	<div class="totals">
 		<span class="lab">Total</span>
@@ -106,6 +110,22 @@
 		display: grid;
 		grid-template-columns: 1fr 1fr;
 	}
+	.body {
+		position: relative;
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		min-height: 0;
+	}
+	.body::before {
+		content: '';
+		position: absolute;
+		left: calc(50% - 1px);
+		top: 0;
+		bottom: 0;
+		width: 2px;
+		background: #1f2133;
+	}
 	.cols {
 		margin-top: 12px;
 		border-bottom: 2px solid #1f2133;
@@ -117,9 +137,11 @@
 		font-weight: 700;
 	}
 	.above {
-		height: 200px;
+		height: 210px;
+		flex: none;
 		align-items: end;
 		border-bottom: 3px solid #b8263a;
+		padding-bottom: 4px;
 	}
 	.above .side {
 		display: flex;
@@ -127,9 +149,6 @@
 	}
 	.side {
 		padding: 0 10px;
-	}
-	.side + .side {
-		border-left: 2px solid #1f2133;
 	}
 	.below {
 		flex: 1;
@@ -160,11 +179,13 @@
 		font-size: 12px;
 		color: #666b80;
 	}
+	/* A won game is ruled off right across the pad. */
 	.ruled {
 		border-top: 1px solid #1f2133;
-		margin: 2px 30px;
-		text-align: center;
+		margin: 3px 0 6px;
+		padding-left: 12px;
 		font-size: 12px;
+		line-height: 1.4;
 		color: #666b80;
 	}
 	.totals {

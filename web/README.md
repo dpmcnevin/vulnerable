@@ -57,6 +57,10 @@ Publish `web/build` (add an empty `.nojekyll` file to it).
   sweeps). The stage scales to fit; tall screens get a portrait layout.
 - `tools/bot.ts`, `tools/simulate.ts`: the balance bot and simulator.
 
+Runs auto-save to localStorage: the engine is deterministic, so a save is
+just the seed plus a log of every action, and loading replays it
+(`src/lib/app/save.ts`). Reload the page and the menu offers "Continue run".
+
 Beyond the original: drag cards to rearrange your hand (or drag a playable
 card onto the table to play it), drag the menu's aces around, and touch
 input throughout.

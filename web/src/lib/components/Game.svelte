@@ -45,6 +45,7 @@
 
 	onMount(() => {
 		settings.load();
+		game.restore();
 		measure();
 		ready = true;
 		window.addEventListener('resize', measure);
