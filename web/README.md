@@ -23,6 +23,12 @@ npm run simulate     # headless balance run: node tools/simulate.ts [runs] [pref
 
 ### Deploying to GitHub Pages
 
+It deploys like isle-wars: `.github/workflows/deploy.yml` (at the repo root)
+builds `web/` and publishes it with GitHub Pages on every push to `main`. In
+a repo named `vulnerable` on the dpmcnevin account, whose custom domain is
+corrupt.net, that serves the game at https://corrupt.net/vulnerable/. Turn
+on Pages once under Settings → Pages → Source: GitHub Actions.
+
 The build is a static site (`@sveltejs/adapter-static`, SPA fallback in
 `404.html`). Asset URLs are prefixed with the Pages base path, `/vulnerable`
 by default; set `BASE_PATH` to match your repository name, or to an empty
