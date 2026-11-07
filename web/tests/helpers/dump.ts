@@ -7,6 +7,11 @@ import * as scoring from '../../src/lib/rules/scoring.ts';
 import * as play from '../../src/lib/rules/play.ts';
 import * as engine from '../../src/lib/game/engine.ts';
 import * as bot from '../../tools/bot.ts';
+import * as pixelcards from '../../src/lib/ui/pixelcards.ts';
+import * as icons from '../../src/lib/ui/icons.ts';
+import * as sounds from '../../src/lib/audio/sounds.ts';
+import type { Bitmap } from '../../src/lib/ui/pixel.ts';
+import type { Buffer } from '../../src/lib/audio/synth.ts';
 import type { Card, Hand, Hands } from '../../src/lib/rules/cards.ts';
 import type { Run } from '../../src/lib/game/engine.ts';
 
@@ -139,4 +144,55 @@ export function dump() {
 	for (let i = 1; i <= 25; i++) playerRuns.push({ seed: 'HUMAN' + i, run: randomPlayer('HUMAN' + i) });
 	out.playerRuns = playerRuns;
 	return out;
+}
+
+const hex2 = (v: number) => Math.round(v * 255).toString(16).padStart(2, '0');
+function serialise(b: Bitmap): number {
+	const parts = b.px.map((c) => (c ? hex2(c[0]) + hex2(c[1]) + hex2(c[2]) + hex2(c[3] ?? 1) : '.'));
+	// Fill holes (never-set pixels) the way Lua's table.concat sees them.
+	for (let i = 0; i < b.w * b.h; i++) if (parts[i] === undefined) parts[i] = '.';
+	return rngLib.hashString(parts.join(',')) >>> 0;
+}
+
+export function dumpPixels() {
+	const pixel: unknown[] = [];
+	for (const four of [true, false]) {
+		for (const card of cards.newDeck()) {
+			for (const trump of [false, true]) {
+				pixel.push([cards.code(card), four, trump, serialise(pixelcards.faceBitmap(card, trump, four))]);
+			}
+		}
+	}
+	const keys = [...Object.keys(icons.ICONS), 'no_such_icon'].sort();
+	return {
+		pixel,
+		pixelBack: serialise(pixelcards.backBitmap()),
+		icons: keys.map((k) => [k, serialise(icons.bitmap(k))])
+	};
+}
+
+function stats(buf: Buffer) {
+	const d = buf.data;
+	let sumAbs = 0,
+		sumSq = 0;
+	for (let i = 0; i < d.length; i++) {
+		sumAbs += Math.abs(d[i]);
+		sumSq += d[i] * d[i];
+	}
+	const at = (k: number) => (k >= 1 && k <= d.length ? d[k - 1] : 0);
+	return {
+		n: d.length,
+		rate: buf.rate,
+		sumAbs,
+		sumSq,
+		probe: [at(1), at(Math.floor(d.length / 3)), at(Math.floor(d.length / 2))]
+	};
+}
+
+export function dumpAudio() {
+	const names = Object.keys(sounds.defs).sort();
+	return {
+		sounds: names.map((k) => [k, stats(sounds.defs[k]())]),
+		music: stats(sounds.renderMusicAll())
+	};
 }

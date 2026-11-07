@@ -214,4 +214,61 @@ for i = 1, 25 do
   out.playerRuns[i] = { seed = seed, run = randomPlayer(seed) }
 end
 
+-- Pixel art: a hash of every card face (both palettes, trump or not), the
+-- back, and every icon tile.
+do
+  local pixelcards = require("src.ui.pixelcards")
+  local cardart = require("src.ui.cardart")
+  local settings = require("src.ui.settings")
+  local icons = require("src.ui.icons")
+  local function serialise(b)
+    local parts = {}
+    for i = 1, b.w * b.h do
+      local c = b.px[i]
+      if c then
+        parts[i] = string.format("%02x%02x%02x%02x", math.floor(c[1] * 255 + 0.5),
+          math.floor(c[2] * 255 + 0.5), math.floor(c[3] * 255 + 0.5), math.floor((c[4] or 1) * 255 + 0.5))
+      else
+        parts[i] = "."
+      end
+    end
+    return rngLib.hashString(table.concat(parts, ",")) % 4294967296
+  end
+  out.pixel = {}
+  for _, four in ipairs({ true, false }) do
+    settings.values.fourColour = four
+    for _, card in ipairs(cards.newDeck()) do
+      for _, trump in ipairs({ false, true }) do
+        local b = pixelcards.faceBitmap(card, trump, cardart.palette, cardart.suitColor)
+        out.pixel[#out.pixel + 1] = { cards.code(card), four, trump, serialise(b) }
+      end
+    end
+  end
+  out.pixelBack = serialise(pixelcards.backBitmap(cardart.palette))
+  local keys = {}
+  for k in pairs(icons.ICONS) do keys[#keys + 1] = k end
+  keys[#keys + 1] = "no_such_icon"
+  table.sort(keys)
+  out.icons = {}
+  for _, k in ipairs(keys) do out.icons[#out.icons + 1] = { k, serialise(icons.bitmap(k)) } end
+end
+
+-- Audio: sample count and a few summary statistics for every sound and the
+-- music loop (compared with a tolerance; sin/exp differ by an ulp or so).
+do
+  local sounds = require("src.audio.sounds")
+  local function stats(buf)
+    local sumAbs, sumSq = 0, 0
+    for i = 1, #buf do sumAbs = sumAbs + math.abs(buf[i]); sumSq = sumSq + buf[i] * buf[i] end
+    return { n = #buf, rate = buf.rate, sumAbs = sumAbs, sumSq = sumSq,
+             probe = { buf[1] or 0, buf[math.floor(#buf / 3)] or 0, buf[math.floor(#buf / 2)] or 0 } }
+  end
+  local names = {}
+  for k in pairs(sounds.defs) do names[#names + 1] = k end
+  table.sort(names)
+  out.sounds = {}
+  for _, k in ipairs(names) do out.sounds[#out.sounds + 1] = { k, stats(sounds.defs[k]()) } end
+  out.music = stats(sounds.renderMusic())
+end
+
 io.write(encode(out), "\n")
