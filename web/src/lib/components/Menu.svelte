@@ -143,6 +143,9 @@
 			onpointerdown={(e) => grab(e, i)}
 		></div>
 	{/each}
+	<div class="version" title="Build {__APP_COMMIT__ || 'local'}">
+		v{__APP_VERSION__}{__APP_COMMIT__ ? ` · ${__APP_COMMIT__}` : ''}
+	</div>
 	{#if scattered}
 		<button class="tidy" onclick={resetFan}>Tidy the aces</button>
 	{/if}
@@ -221,6 +224,18 @@
 	}
 	.grab.held {
 		cursor: grabbing;
+	}
+	.version {
+		position: absolute;
+		left: 20px;
+		bottom: 18px;
+		z-index: 60;
+		font-size: 14px;
+		color: var(--ink-dim);
+		opacity: 0.8;
+		text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.5);
+		font-variant-numeric: tabular-nums;
+		pointer-events: none;
 	}
 	.tidy {
 		position: absolute;
