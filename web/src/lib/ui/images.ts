@@ -38,11 +38,11 @@ export function setDeviceScale(cssPxPerStagePx: number) {
 	pixelScale = Math.max(1, Math.min(8, Math.ceil((CARD_W / pixelcards.W) * cssPxPerStagePx * dpr)));
 }
 
-export function cardFace(card: Card, trump: boolean, pixel: boolean, fourColour: boolean): string {
-	const key = `${cards.code(card)}|${trump ? 't' : ''}|${pixel ? 'p' + pixelScale : 's'}|${fourColour ? 4 : 2}`;
+export function cardFace(card: Card, trump: boolean, pixel: boolean, fourColor: boolean): string {
+	const key = `${cards.code(card)}|${trump ? 't' : ''}|${pixel ? 'p' + pixelScale : 's'}|${fourColor ? 4 : 2}`;
 	return cached(key, () => {
-		if (pixel) return url(toCanvas(pixelcards.faceBitmap(card, trump, fourColour), pixelScale));
-		return smooth((g) => cardart.face(g, card, trump, fourColour));
+		if (pixel) return url(toCanvas(pixelcards.faceBitmap(card, trump, fourColor), pixelScale));
+		return smooth((g) => cardart.face(g, card, trump, fourColor));
 	});
 }
 

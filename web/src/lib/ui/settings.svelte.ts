@@ -1,12 +1,12 @@
 // Player settings, persisted in localStorage. Port of src/ui/settings.lua.
 
-export type SettingKey = 'music' | 'sfx' | 'fourColour' | 'pixelCards' | 'rubberView';
+export type SettingKey = 'music' | 'sfx' | 'fourColor' | 'pixelCards' | 'rubberView';
 
 const STORAGE_KEY = 'vulnerable.settings';
 const DEFAULTS: Record<SettingKey, boolean> = {
 	music: true,
 	sfx: true,
-	fourColour: true,
+	fourColor: true,
 	pixelCards: true,
 	rubberView: false
 };
@@ -14,7 +14,7 @@ const DEFAULTS: Record<SettingKey, boolean> = {
 class Settings {
 	music = $state(DEFAULTS.music);
 	sfx = $state(DEFAULTS.sfx);
-	fourColour = $state(DEFAULTS.fourColour);
+	fourColor = $state(DEFAULTS.fourColor);
 	pixelCards = $state(DEFAULTS.pixelCards);
 	rubberView = $state(DEFAULTS.rubberView);
 

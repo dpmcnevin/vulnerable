@@ -2,7 +2,7 @@
 //
 // Each card is a 40x56 bitmap built from hand-drawn sprites and drawn at an
 // integer scale with nearest-neighbour filtering. The palette and suit
-// colours live here too (they were in cardart.lua), so both card styles
+// colors live here too (they were in cardart.lua), so both card styles
 // share them.
 
 import * as cards from '../rules/cards.ts';
@@ -34,7 +34,7 @@ const TWO: Record<number, Color> = {
 	3: hex('#c8323c'),
 	4: hex('#1b1d26')
 };
-// The four-colour deck many bridge players prefer: suits never get confused.
+// The four-color deck many bridge players prefer: suits never get confused.
 const FOUR: Record<number, Color> = {
 	1: hex('#23804e'),
 	2: hex('#d9771f'),
@@ -42,8 +42,8 @@ const FOUR: Record<number, Color> = {
 	4: hex('#1b1d26')
 };
 
-export function suitColor(suit: number, fourColour: boolean): Color {
-	return (fourColour ? FOUR : TWO)[suit];
+export function suitColor(suit: number, fourColor: boolean): Color {
+	return (fourColor ? FOUR : TWO)[suit];
 }
 
 // --------------------------------------------------------------------- helpers
@@ -140,7 +140,7 @@ function ace(b: Bitmap, card: Card, color: Color) {
 }
 
 function court(b: Bitmap, card: Card, color: Color) {
-	// Stepped-arch panel, tinted with the suit colour.
+	// Stepped-arch panel, tinted with the suit color.
 	const tint: Color = [
 		P.cream[0] + (color[0] - P.cream[0]) * 0.18,
 		P.cream[1] + (color[1] - P.cream[1]) * 0.18,
@@ -188,9 +188,9 @@ function trumpMark(b: Bitmap) {
 // --------------------------------------------------------------------- builders
 
 /** Build the bitmap for a face-up card. */
-export function faceBitmap(card: Card, trump: boolean, fourColour: boolean): Bitmap {
+export function faceBitmap(card: Card, trump: boolean, fourColor: boolean): Bitmap {
 	const b = newBitmap(W, H);
-	const color = suitColor(card.suit, fourColour);
+	const color = suitColor(card.suit, fourColor);
 	body(b, trump ? P.trumpCream : P.cream);
 	b.rect(2, 2, W - 4, H - 4, P.gold);
 	if (card.rank === 14) ace(b, card, color);

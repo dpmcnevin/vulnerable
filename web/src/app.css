@@ -1,0 +1,50 @@
+/* The table at night: deep green baize, cream cards, brass accents.
+   Mirrors lib/ui/theme.ts for the DOM panels. */
+:root {
+	--bg: #0b1f17;
+	--felt: #14402c;
+	--felt-light: #1c5239;
+	--felt-edge: #0e2d20;
+	--sidebar: #0f1a16;
+	--panel: #15241e;
+	--panel-edge: #2c4a3d;
+	--ink: #ece6d6;
+	--ink-dim: #9fb3a8;
+	--ink-faint: #5f7a6d;
+	--brass: #d9a441;
+	--brass-dim: #8a6a2c;
+	--good: #4fbf7a;
+	--warn: #e3b341;
+	--bad: #e0604f;
+	--chips: #4a9fe0;
+	--mult: #e0604f;
+	--gold: #c9a24a;
+	--ploy: #8e6bd1;
+	--ploy-light: #c2adf0;
+	color-scheme: dark;
+}
+
+html,
+body {
+	margin: 0;
+	height: 100%;
+	background: var(--bg);
+	color: var(--ink);
+	font-family: 'Avenir Next', 'Segoe UI', system-ui, -apple-system, sans-serif;
+	overscroll-behavior: none;
+}
+
+/* Panels over the table share this look. */
+.panel {
+	position: absolute;
+	box-sizing: border-box;
+	background: var(--panel);
+	border: 2px solid var(--brass-dim);
+	border-radius: 10px;
+	box-shadow: 4px 6px 0 rgba(0, 0, 0, 0.35);
+	color: var(--ink);
+}
+
+button {
+	color: inherit;
+}

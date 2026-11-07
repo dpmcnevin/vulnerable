@@ -1,6 +1,6 @@
 // A tiny pixel-art bitmap library. Port of src/ui/pixel.lua.
 //
-// Bitmaps are plain arrays of colours, so every card and icon is built and
+// Bitmaps are plain arrays of colors, so every card and icon is built and
 // tested without a browser. `toCanvas` turns one into a canvas, scaled up by
 // an integer factor with nearest-neighbour sampling so pixels stay hard.
 
@@ -105,7 +105,7 @@ export class Bitmap {
 
 	/**
 	 * Stamp a sprite given as rows of characters. `palette` maps characters to
-	 * colours; unmapped characters ('.' and space) are transparent.
+	 * colors; unmapped characters ('.' and space) are transparent.
 	 * `flip` rotates the sprite 180 degrees (for the lower half of a card).
 	 */
 	sprite(rows: string[], palette: Record<string, Color>, x: number, y: number, opts?: { flip?: boolean }) {

@@ -1,8 +1,8 @@
-// Colours and card sizes. Port of src/ui/theme.lua.
+// Colors and card sizes. Port of src/ui/theme.lua.
 //
 // The look is a card-room table at night: deep green baize, cream cards,
-// brass accents. Colours are [r, g, b, a] in 0..1, as in LÖVE; `css()`
-// turns one into a CSS colour. The same palette is mirrored as CSS custom
+// brass accents. Colors are [r, g, b, a] in 0..1, as in LÖVE; `css()`
+// turns one into a CSS color. The same palette is mirrored as CSS custom
 // properties in app.css for the DOM panels.
 
 export type Color = [number, number, number, number];

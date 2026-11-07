@@ -1,5 +1,5 @@
 // Hand-drawn pixel sprites: suit symbols, pixel fonts and court crests.
-// Port of src/ui/pixelsprites.lua. '#' marks an opaque pixel; colours are
+// Port of src/ui/pixelsprites.lua. '#' marks an opaque pixel; colors are
 // supplied when stamping. Tables are indexed by suit or rank id.
 
 import type { Color } from './theme.ts';
@@ -46,14 +46,14 @@ export const MONOGRAM: Record<number, string[]> = {
 export const V = ['#...#', '#...#', '.#.#.', '.#.#.', '..#..'];
 
 // Crests above the monogram: crown (K), coronet (Q), plume chevron (J).
-// g = gold, G = light gold, r = jewel (the suit colour).
+// g = gold, G = light gold, r = jewel (the suit color).
 export const CREST: Record<number, string[]> = {
 	13: ['g...g...g', 'gg.ggg.gg', 'ggggggggg', 'gGgGrGgGg', 'ggggggggg'],
 	12: ['...ggg...', '..gGrGg..', '.ggggggg.', '.gGgGgGg.', '.ggggggg.'],
 	11: ['....g....', '...gGg...', '..gg.gg..', '.gg...gg.', 'gg.....gg']
 };
 
-/** A palette that paints every '#' in one colour. */
+/** A palette that paints every '#' in one color. */
 export function solid(color: Color): Record<string, Color> {
 	return { '#': color };
 }

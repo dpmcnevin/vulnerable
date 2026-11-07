@@ -216,10 +216,10 @@ function trumpMark(g: G, w: number, h: number) {
 }
 
 /** Draw a face-up card centred on the origin. */
-export function face(g: G, card: Card, trump: boolean, fourColour: boolean) {
+export function face(g: G, card: Card, trump: boolean, fourColor: boolean) {
 	const w = CARD_W,
 		h = CARD_H;
-	const color = suitColor(card.suit, fourColour);
+	const color = suitColor(card.suit, fourColor);
 	cardBody(g, w, h, trump ? P.trumpCream : P.cream, P.ink);
 
 	// Inner gold border with deco corner diamonds.

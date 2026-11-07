@@ -193,6 +193,6 @@ export function dumpAudio() {
 	const names = Object.keys(sounds.defs).sort();
 	return {
 		sounds: names.map((k) => [k, stats(sounds.defs[k]())]),
-		music: stats(sounds.renderMusicAll())
+		music: stats(sounds.renderMusicClassicAll())
 	};
 }
